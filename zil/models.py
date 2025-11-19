@@ -16,7 +16,7 @@ class User(Base):
     user_id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, nullable=False)
     salary = Column(Float, default=0.0)
-
+    hashed_password = Column(String, nullable=False) 
     expenses = relationship("Expense", back_populates="user")
 
 
@@ -28,6 +28,7 @@ class Expense(Base):
     name = Column(String, nullable=False)
     amount = Column(Float, nullable=False)
     category = Column(Enum(CategoryEnum), nullable=False)
+    
     created_at = Column(DateTime, server_default=func.now())
 
     user = relationship("User", back_populates="expenses")

@@ -1,12 +1,50 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from .database import get_db
 from .models import User, Expense
-from .schemas import UserCreate, UserOut, ExpenseCreate, ExpenseOut, TotalOut
+from .schemas import UserCreate, UserOut, ExpenseCreate, ExpenseOut, TotalOut, Token
+from .utils import verify_password, get_password_hash, create_access_token, decode_access_token
+from .settings import ACCESS_TOKEN_EXPIRE
 from datetime import datetime
 from sqlalchemy import func, extract
 
+"""auth Routes """
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+
+
+@router.post("/register", response_model=Token)
+async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+    # Check username exists
+    q = await db.execute(select(User).where(User.username == user_in.username))
+    existing = q.scalars().first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already registered")
+
+    hashed = get_password_hash(user_in.password)
+    new_user = User(username=user_in.username, salary=user_in.salary, hashed_password=hashed)
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+
+    access_token = create_access_token({"sub": new_user.username}, expires_delta=ACCESS_TOKEN_EXPIRE)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    q = await db.execute(select(User).where(User.username == form_data.username))
+    user = q.scalars().first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+
+    access_token = create_access_token({"sub": user.username}, expires_delta=ACCESS_TOKEN_EXPIRE)
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 """ User Routes """

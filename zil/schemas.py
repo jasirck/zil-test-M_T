@@ -6,6 +6,7 @@ from .models import CategoryEnum
 class UserCreate(BaseModel):
     username: str
     salary: Optional[float] = 0.0
+    password: str
 
 class UserOut(BaseModel):
     user_id: int
@@ -15,6 +16,12 @@ class UserOut(BaseModel):
     class Config:
         orm_mode = True
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 class ExpenseCreate(BaseModel):
     user_id: int
